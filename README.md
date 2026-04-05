@@ -8,7 +8,7 @@ Developed as part of PhD research at **CSIR-IGIB**, this tool transforms abstrac
 
 ## 🌐 Live Demo
 
-👉 https://Soumen-97.github.io/protein-translation-ar/
+👉 https://soumen-97.github.io/Protein-Translation-AR/
 
 *(Open on Chrome/Edge and allow camera access)*
 
