@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5cf8ff">
+  
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>🧬 Protein Translation AR Lab</title>
@@ -1096,5 +1099,13 @@ async function init(){
 }
 init();
 </script>
+<!-- PWA: Install Prompt Handling -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+    .then(() => console.log('Service Worker Registered'));
+}
+</script>
+
 </body>
 </html>
