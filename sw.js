@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ar-lab-v2';
+const CACHE_NAME = 'ar-lab-v3';
 
 const urlsToCache = [
   './',
