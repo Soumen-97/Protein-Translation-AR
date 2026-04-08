@@ -204,6 +204,8 @@ const S = {
   nucSndThrottle:0,
   // Menu
   menuOpen:true,
+  dwellItem:null,   // id of item finger is hovering ('__toggle__' for toggle btn)
+  dwellStart:0,     // performance.now() timestamp when hover began
 };
 
 let lastHands=null, t=0;
@@ -575,7 +577,8 @@ function drawSummary(){
   ctx.fillText('🎉 Protein Successfully Synthesised!',px+pw/2,py+14);
 
   // Amino acid chain summary
-  const beadR=10, beadSpacing=30;
+  const beadR=7;
+  const beadSpacing=Math.min(30, Math.floor((pw-20)/(S.chain.length-1)));
   const chainW=(S.chain.length-1)*beadSpacing;
   let bx=px+(pw-chainW)/2, by=py+60;
   S.chain.forEach((aa,i)=>{
@@ -622,6 +625,11 @@ function drawSummary(){
 // ═══════════════════════════════════════════════════════════════════
 //  DRAW: MENU  (collapsible, 3 items only)
 // ═══════════════════════════════════════════════════════════════════
+
+// Left edge of the entire menu zone (panel + toggle). Set each frame by
+// drawMenu() so that draw-mode can avoid placing mRNA points under the menu.
+let menuBoundsX = 9999;
+
 const MENU=[
   {id:'mrna',  label:'mRNA Strand', sub:'(Draw)',    icon:'≋'},
   {id:'ribo',  label:'Ribosome',    sub:'(Assemble)',icon:'◉'},
@@ -634,10 +642,17 @@ function drawMenu(){
   const totalH=MENU.length*(ih+gap)-gap+(S.menuOpen?px2*2:8);
   const mx=W-mw-12, my=(H-totalH)/2;
 
+  // Record the leftmost x of the whole menu zone (panel + toggle button) so
+  // that draw-mode update() can skip adding points inside this area.
+  // Toggle button starts at togX = W-44-12 = W-56; panel starts at mx-px2.
+  // Take the smaller (further left) of the two, with a 10px safety buffer.
+  const togX=W-44-12;
+  menuBoundsX = Math.min(togX, mx-px2) - 10;
+
   ctx.save();
 
   // Toggle button
-  const togX=W-44-12, togY=my-40;
+  const togY=my-40;
   ctx.fillStyle='rgba(6,13,26,.85)'; ctx.strokeStyle='rgba(92,248,255,.3)'; ctx.lineWidth=1;
   roundRect(ctx,togX,togY,40,32,10); ctx.fill(); ctx.stroke();
   ctx.fillStyle='#5cf8ff'; ctx.font="14px 'Segoe UI'"; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -678,6 +693,21 @@ function drawMenu(){
 
     item.bx=mx-px2; item.by=iy; item.bw=mw+px2*2; item.bh=ih;
     item.togBx=togX; item.togBy=togY; item.togBw=40; item.togBh=32;
+
+    // Dwell progress arc around the icon
+    if(S.dwellItem===item.id){
+      const pct=Math.min(1,(performance.now()-S.dwellStart)/3000);
+      const cx=ic, cy=iy+ih/2+5, r=16;
+      ctx.save();
+      // Background ring
+      ctx.strokeStyle='rgba(92,248,255,.2)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,Math.PI*1.5); ctx.stroke();
+      // Progress arc
+      ctx.strokeStyle='#5cf8ff'; ctx.lineWidth=3;
+      ctx.shadowBlur=10; ctx.shadowColor='#5cf8ff';
+      ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
   });
 
   ctx.restore();
@@ -698,13 +728,25 @@ function drawInstructions(){
   const txt=INST[S.mode]||'';
   if(!txt) return;
   ctx.save();
-  ctx.font="13px 'Segoe UI'";
-  const tw=Math.min(ctx.measureText(txt).width+40, W-32);
-  const bx=W/2-tw/2, by=H-58, bh=36;
+  const fz=13;
+  ctx.font=`${fz}px 'Segoe UI'`;
+  // Split into lines that fit the screen width
+  const maxW=W-32;
+  const words=txt.split(' '); const lines=[]; let line='';
+  for(const w of words){
+    const test=line?line+' '+w:w;
+    if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=w;}
+    else line=test;
+  }
+  if(line) lines.push(line);
+  const lh=fz*1.4;
+  const bh=lines.length*lh+16;
+  const bw=Math.min(ctx.measureText(lines[0]).width+40, maxW);
+  const bx=W/2-bw/2, by=H-bh-10;
   ctx.fillStyle='rgba(6,13,26,.82)'; ctx.strokeStyle='rgba(92,248,255,.22)'; ctx.lineWidth=1;
-  roundRect(ctx,bx,by,tw,bh,18); ctx.fill(); ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(txt,W/2,by+bh/2);
+  roundRect(ctx,bx,by,bw,bh,18); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.textAlign='center'; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,W/2,by+8+i*lh));
   ctx.restore();
 }
 
@@ -777,7 +819,7 @@ function drawHeader(){
   ctx.fillText('🧬 Protein Translation AR Lab',16,24);
   ctx.shadowBlur=0; ctx.fillStyle='rgba(92,248,255,.4)';
   ctx.font="11px 'Segoe UI'"; ctx.textAlign='right';
-  ctx.fillText('CSIR-IGIB · PhD Research · Class 9–12',W-60,24);
+  ctx.fillText('CSIR-IGIB · Class 9–12',W-60,24);
   ctx.restore();
 }
 
@@ -804,18 +846,61 @@ function flash(msg){S.flashMsg=msg;S.flashA=1.8;}
 let _prevNucIdx=-1;
 
 function update(lms){
-  if(!lms){S.ribGrab=false;return;}
+  if(!lms){S.ribGrab=false;S.dwellItem=null;S.dwellStart=0;return;}
   const idx=indexTip(lms);
   const pdist=pinchDist(lms);
   const pinching=pdist<50;
   const mid=pinchMid(lms);
+
+  // ── DWELL-HOVER GESTURE: hold index finger over a menu item for 3s ──
+  // Fires the item automatically — works on both mobile and laptop.
+  {
+    const DWELL_MS=3000;
+    let hoveredId=null;
+
+    // Check toggle button first
+    const tog=MENU[0];
+    if(tog&&tog.togBx!==undefined&&
+       idx.x>=tog.togBx&&idx.x<=tog.togBx+tog.togBw&&
+       idx.y>=tog.togBy&&idx.y<=tog.togBy+tog.togBh){
+      hoveredId='__toggle__';
+    }
+    // Check each menu item
+    if(!hoveredId){
+      for(const item of MENU){
+        if(item.bx===undefined) continue;
+        if(idx.x>=item.bx&&idx.x<=item.bx+item.bw&&
+           idx.y>=item.by&&idx.y<=item.by+item.bh){
+          hoveredId=item.id; break;
+        }
+      }
+    }
+
+    if(hoveredId){
+      if(S.dwellItem===hoveredId){
+        if(performance.now()-S.dwellStart>=DWELL_MS){
+          // Fire!
+          if(hoveredId==='__toggle__') S.menuOpen=!S.menuOpen;
+          else handleMenu(hoveredId);
+          S.dwellItem=null; S.dwellStart=0;
+        }
+      } else {
+        S.dwellItem=hoveredId;
+        S.dwellStart=performance.now();
+      }
+    } else {
+      S.dwellItem=null; S.dwellStart=0;
+    }
+  }
 
   // ── DRAW MODE ──────────────────────────────────────────────────
   if(S.mode==='draw'){
     if(isIndexUp(lms)){
       const prev=S.prevDrawPt;
       const dp=prev?Math.hypot(idx.x-prev.x,idx.y-prev.y):99;
-      if(dp>8){
+      // FIX 1: do not add points while the finger is inside the menu zone
+      const inMenuZone = idx.x >= menuBoundsX;
+      if(dp>8 && !inMenuZone){
         S.rawPts.push({x:idx.x,y:idx.y});
         S.prevDrawPt={...idx};
         // Play nucleotide sound every ~8 pts
@@ -824,10 +909,10 @@ function update(lms){
           const ni=Math.floor(S.rawPts.length/8)%MRNA_SEQ.length;
           sndNucleotide(MRNA_SEQ[ni]);
         }
-        // Live preview
+        // FIX 2: set pathOk=true so nucleotides & codon labels appear while drawing
         if(S.rawPts.length>6){
           S.path=resample(smooth(S.rawPts,2),TOTAL_PTS);
-          S.pathOk=false; // still drawing — show live preview only
+          S.pathOk=true; // show full mRNA decoration live during drawing
         }
       }
     }
@@ -1029,7 +1114,7 @@ function tryMenuClick(cx,cy){
   }
   // Menu items
   MENU.forEach(item=>{
-    if(!item.bx) return;
+    if(item.bx===undefined) return;   // was: if(!item.bx) — wrongly skipped bx=0
     if(cx>=item.bx&&cx<=item.bx+item.bw&&cy>=item.by&&cy<=item.by+item.bh){
       if(!S.menuOpen){S.menuOpen=true; return;}
       handleMenu(item.id);
@@ -1038,15 +1123,25 @@ function tryMenuClick(cx,cy){
 }
 
 const cv2=document.getElementById('c');
-cv2.addEventListener('click',e=>{
+
+// Scale client coords to canvas draw coords, handling any CSS↔attribute mismatch
+function toCanvasXY(clientX,clientY){
   const r=cv2.getBoundingClientRect();
-  tryMenuClick(e.clientX-r.left,e.clientY-r.top);
+  return{
+    x:(clientX-r.left)*(cv2.width /r.width),
+    y:(clientY-r.top) *(cv2.height/r.height)
+  };
+}
+
+cv2.addEventListener('click',e=>{
+  const{x,y}=toCanvasXY(e.clientX,e.clientY);
+  tryMenuClick(x,y);
   if(AC?.state==='suspended') AC.resume();
 });
 cv2.addEventListener('touchstart',e=>{
   e.preventDefault();
-  const r=cv2.getBoundingClientRect();
-  tryMenuClick(e.touches[0].clientX-r.left,e.touches[0].clientY-r.top);
+  const{x,y}=toCanvasXY(e.touches[0].clientX,e.touches[0].clientY);
+  tryMenuClick(x,y);
   if(AC?.state==='suspended') AC.resume();
 },{passive:false});
 
