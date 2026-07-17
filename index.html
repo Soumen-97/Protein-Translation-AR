@@ -473,9 +473,15 @@ function drawPolypeptide(){
   let px = S.ribX + Math.cos(exitAng)*28;
   let py = S.ribY + Math.sin(exitAng)*28 - 26 + floatY;
 
-  S.chain.forEach((aa,i)=>{
+  // Draw newest amino acid closest to the ribosome (C-terminal growth point)
+  // and older ones — starting with the N-terminal Met — farther out, since the
+  // chain is extruded through the exit tunnel as translation proceeds.
+  const chainLen = S.chain.length;
+  for(let pos=0; pos<chainLen; pos++){
+    const i  = chainLen-1-pos; // pos=0 -> most recently added codon
+    const aa = S.chain[i];
     const bounce = aa.bounce || 0;
-    const spread = (i+1)*32;
+    const spread = (pos+1)*32;
     const wiggle = Math.sin(i*1.2+t*0.5)*14;
     const perpA  = exitAng + Math.PI/2;
     const cx     = px + Math.cos(exitAng)*spread + Math.cos(perpA)*wiggle;
@@ -486,7 +492,7 @@ function drawPolypeptide(){
     g2.addColorStop(0,`rgba(255,255,255,${0.2*aa.alpha})`);
     g2.addColorStop(1,`rgba(255,255,255,${0.07*aa.alpha})`);
     ctx.strokeStyle=g2; ctx.lineWidth=3; ctx.shadowBlur=0;
-    ctx.beginPath(); ctx.moveTo(i===0?S.ribX+Math.cos(exitAng)*18:px,i===0?S.ribY+Math.sin(exitAng)*18-26+floatY:py); ctx.lineTo(cx,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pos===0?S.ribX+Math.cos(exitAng)*18:px,pos===0?S.ribY+Math.sin(exitAng)*18-26+floatY:py); ctx.lineTo(cx,cy); ctx.stroke();
 
     // bead
     const br=ctx.createRadialGradient(cx-5,cy-5,0,cx,cy,17);
@@ -505,7 +511,7 @@ function drawPolypeptide(){
     if(aa.bounce>0) aa.bounce=Math.max(0,aa.bounce-0.06);
     aa.sx=cx; aa.sy=cy;
     px=cx; py=cy;
-  });
+  }
 
   ctx.globalAlpha=1;
   ctx.restore();
