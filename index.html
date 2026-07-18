@@ -50,7 +50,7 @@ const LOGO_IMG = new Image();
 LOGO_IMG.src = LOGO_IMG_SRC;
 function drawInstituteLogo(){
   if(!LOGO_IMG.naturalWidth) return;
-  const margin = 60 + SAFE_BOTTOM;
+  const margin = 16;
   const dw = Math.min(150, W*0.20);
   const dh = dw * (LOGO_IMG.naturalHeight / LOGO_IMG.naturalWidth);
   ctx.save();
