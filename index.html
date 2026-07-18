@@ -9,6 +9,7 @@
 <title>🧬 Protein Translation AR Lab</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+#safe-area-probe{position:fixed;bottom:0;left:0;width:1px;padding-bottom:env(safe-area-inset-bottom, 0px);pointer-events:none;visibility:hidden}
 body{background:#060d1a;overflow:hidden;font-family:'Segoe UI',sans-serif;user-select:none}
 #wrap{position:relative;width:100vw;height:100vh}
 video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;pointer-events:none}
@@ -18,7 +19,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 #loading p{color:rgba(255,255,255,.45);font-size:14px;max-width:320px;line-height:1.7}
 .spinner{width:44px;height:44px;border:2.5px solid rgba(255,255,255,.1);border-top-color:#5cf8ff;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#mute{position:absolute;bottom:16px;right:16px;z-index:100;background:rgba(6,13,26,.8);border:1px solid rgba(92,248,255,.3);color:#5cf8ff;font-size:20px;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#mute{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom, 0px));right:16px;z-index:100;background:rgba(6,13,26,.8);border:1px solid rgba(92,248,255,.3);color:#5cf8ff;font-size:20px;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #mute:hover{background:rgba(92,248,255,.15)}
 </style>
 </head>
@@ -31,6 +32,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
   <p style="font-size:12px;color:rgba(255,255,255,.25);margin-top:4px">CSIR-IGIB · PhD Research · Class 9–12 Biology</p>
 </div>
 
+<div id="safe-area-probe"></div>
 <div id="wrap">
   <video id="vid" playsinline></video>
   <canvas id="c"></canvas>
@@ -48,7 +50,7 @@ const LOGO_IMG = new Image();
 LOGO_IMG.src = LOGO_IMG_SRC;
 function drawInstituteLogo(){
   if(!LOGO_IMG.naturalWidth) return;
-  const margin = 18;
+  const margin = 18 + SAFE_BOTTOM;
   const dw = Math.min(150, W*0.20);
   const dh = dw * (LOGO_IMG.naturalHeight / LOGO_IMG.naturalWidth);
   ctx.save();
@@ -63,7 +65,7 @@ function drawCopyright(){
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.font=`400 11px 'Segoe UI',sans-serif`;
   ctx.fillStyle='rgba(255,255,255,0.25)';
-  ctx.fillText('© Created by Soumen Kundu', W/2, H-10);
+  ctx.fillText('© Created by Soumen Kundu', W/2, H-10-SAFE_BOTTOM);
   ctx.restore();
 }
 
@@ -188,9 +190,28 @@ const cv    = document.getElementById('c');
 const ctx   = cv.getContext('2d');
 const loadEl= document.getElementById('loading');
 const ltxt  = document.getElementById('ltxt');
-let W, H;
-function resize(){ W=cv.width=window.innerWidth; H=cv.height=window.innerHeight; }
+let W, H, SAFE_BOTTOM = 0;
+const safeAreaProbe = document.getElementById('safe-area-probe');
+function readSafeBottom(){
+  const v = parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
+  SAFE_BOTTOM = v;
+}
+function resize(){
+  // Use the visual viewport when available: on mobile, window.innerHeight
+  // reports the full LAYOUT height (including space the address bar / nav
+  // bar currently occupies), which is why bottom-anchored canvas content
+  // (like the logo/caption) can end up drawn underneath that browser
+  // chrome. visualViewport reflects what's ACTUALLY visible right now.
+  const vv = window.visualViewport;
+  W = cv.width  = Math.round(vv ? vv.width  : window.innerWidth);
+  H = cv.height = Math.round(vv ? vv.height : window.innerHeight);
+  readSafeBottom();
+}
 resize(); window.addEventListener('resize',resize);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resize);
+  window.visualViewport.addEventListener('scroll', resize);
+}
 
 const COUNTDOWN_MS = 5000;  // "get ready" pause before drawing starts
 const DRAW_TIME_MS  = 15000; // how long the user is allowed to draw the mRNA strand
@@ -891,7 +912,7 @@ function drawInstructions(){
   // translation progress bar (fixed band, shown during translate/done modes).
   const logoDw = Math.min(150, W*0.20);
   const logoDh = LOGO_IMG.naturalWidth ? logoDw*(LOGO_IMG.naturalHeight/LOGO_IMG.naturalWidth) : 0;
-  const logoReserve = logoDh + 18 + 14; // logo height + its own margin + gap
+  const logoReserve = logoDh + 18 + SAFE_BOTTOM + 14; // logo height + its own margin (incl. safe-area) + gap
   const muteReserve = 16 + 40 + 14; // mute button bottom offset + height + gap
   // Progress bar: label sits at by-4 with 11px font above a bar at by..by+8,
   // where by = H-118. Its own top edge is roughly at H-133, so clearing it
