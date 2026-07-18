@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#5cf8ff">
   
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>🧬 Protein Translation AR Lab</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -587,9 +587,14 @@ function drawFlash(){
   ctx.save();
   ctx.globalAlpha=Math.min(1,S.flashA);
   ctx.shadowBlur=28; ctx.shadowColor='#5cf8ff';
-  ctx.fillStyle='#fff'; ctx.font="bold 20px 'Segoe UI'";
+  const fz = W<480 ? 16 : 20;
+  ctx.fillStyle='#fff'; ctx.font=`bold ${fz}px 'Segoe UI'`;
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(S.flashMsg,W/2,H*0.25);
+  const maxW=W-32;
+  const lines=wrapText(S.flashMsg,maxW);
+  const lh=fz*1.3;
+  const startY=H*0.25-((lines.length-1)*lh)/2;
+  lines.forEach((l,i)=>ctx.fillText(l,W/2,startY+i*lh));
   ctx.restore();
   S.flashA=Math.max(0,S.flashA-0.011);
 }
@@ -599,10 +604,43 @@ function drawFlash(){
 // ═══════════════════════════════════════════════════════════════════
 function drawSummary(){
   if(S.summaryA<=0) return;
-  const pw=Math.min(460,W-32), ph=280;
-  const px=(W-pw)/2, py=(H-ph)/2;
+  const isNarrow = W<480;
+  // Keep the panel clear of the AR menu column (menuBoundsX is set each frame
+  // by drawMenu(), which runs before this). Leaves a small gap so the panel
+  // never overlaps the menu toggle/panel, especially on narrow mobile widths.
+  const leftEdge=16, rightEdge=Math.min(W-16, menuBoundsX-10);
+  const availW=Math.max(200, rightEdge-leftEdge);
+  const pw=Math.min(460,availW);
+  const innerW = pw-40; // usable text width inside panel padding
   ctx.save();
   ctx.globalAlpha=Math.min(1,S.summaryA);
+
+  // Header font/text scales down on narrow screens
+  const headFz = isNarrow ? 15 : 18;
+  const headTxt = isNarrow ? '🎉 Protein Synthesised!' : '🎉 Protein Successfully Synthesised!';
+
+  // Stats line: wrap if it doesn't fit
+  const aaCount=S.chain.filter(a=>!a.stop).length;
+  const statsFz = isNarrow ? 11 : 13;
+  ctx.font=`${statsFz}px 'Segoe UI'`;
+  const statsTxt=`${aaCount} amino acids · Approx. ${(aaCount*110/1000).toFixed(2)} kDa · Codons read: ${NC}`;
+  const statsLines=wrapText(statsTxt,innerW);
+
+  // mRNA line: wrap (monospace) if it doesn't fit
+  const mrnaFz = isNarrow ? 9 : 11;
+  ctx.font=`${mrnaFz}px monospace`;
+  const mrnaTxt=`mRNA 5'-${MRNA_SEQ}-3'`;
+  const mrnaLines=wrapText(mrnaTxt,innerW);
+
+  const stepFz = isNarrow ? 10 : 11;
+  const steps=['① Ribosome dissociates → subunits recycle','② Polypeptide folds into 3D structure','③ Chaperones assist correct folding','④ Protein targets its destination'];
+
+  // Dynamically compute panel height so wrapped content always fits
+  const beadY=60, statsY=beadY+45, mrnaY=statsY+statsLines.length*(statsFz*1.3)+8;
+  const stepsY=mrnaY+mrnaLines.length*(mrnaFz*1.4)+20;
+  const stepLh = stepFz*1.55;
+  const ph = stepsY + steps.length*stepLh + 30;
+  const px=leftEdge+(availW-pw)/2, py=(H-ph)/2;
 
   // Panel
   ctx.fillStyle='rgba(6,13,26,.92)';
@@ -610,15 +648,15 @@ function drawSummary(){
   roundRect(ctx,px,py,pw,ph,16); ctx.fill(); ctx.stroke();
 
   // Header
-  ctx.fillStyle='#5cf8ff'; ctx.font="bold 18px 'Segoe UI'";
+  ctx.fillStyle='#5cf8ff'; ctx.font=`bold ${headFz}px 'Segoe UI'`;
   ctx.textAlign='center'; ctx.textBaseline='top';
-  ctx.fillText('🎉 Protein Successfully Synthesised!',px+pw/2,py+14);
+  ctx.fillText(headTxt,px+pw/2,py+14);
 
   // Amino acid chain summary
-  const beadR=7;
-  const beadSpacing=Math.min(30, Math.floor((pw-20)/(S.chain.length-1)));
+  const beadR=isNarrow?6:7;
+  const beadSpacing=Math.min(isNarrow?22:30, Math.floor((pw-20)/(S.chain.length-1)));
   const chainW=(S.chain.length-1)*beadSpacing;
-  let bx=px+(pw-chainW)/2, by=py+60;
+  let bx=px+(pw-chainW)/2, by=py+beadY;
   S.chain.forEach((aa,i)=>{
     ctx.fillStyle=aa.col; ctx.shadowBlur=8; ctx.shadowColor=aa.col;
     ctx.beginPath(); ctx.arc(bx+i*beadSpacing,by,beadR,0,Math.PI*2); ctx.fill();
@@ -630,25 +668,25 @@ function drawSummary(){
       ctx.beginPath(); ctx.moveTo(bx+i*beadSpacing+beadR,by); ctx.lineTo(bx+(i+1)*beadSpacing-beadR,by); ctx.stroke();
     }
     // AA name below
-    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='6px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
-    if(!aa.stop) ctx.fillText(aa.aa,bx+i*beadSpacing,by+beadR+3);
+    if(!isNarrow){
+      ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='6px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+      if(!aa.stop) ctx.fillText(aa.aa,bx+i*beadSpacing,by+beadR+3);
+    }
   });
 
-  // Stats
-  const aaCount=S.chain.filter(a=>!a.stop).length;
-  ctx.fillStyle='rgba(255,255,255,.7)'; ctx.font="13px 'Segoe UI'";
+  // Stats (wrapped)
+  ctx.fillStyle='rgba(255,255,255,.7)'; ctx.font=`${statsFz}px 'Segoe UI'`;
   ctx.textAlign='center'; ctx.textBaseline='top';
-  ctx.fillText(`${aaCount} amino acids · Approx. ${(aaCount*110/1000).toFixed(2)} kDa · Codons read: ${NC}`,px+pw/2,py+105);
+  statsLines.forEach((l,i)=>ctx.fillText(l,px+pw/2,py+statsY+i*(statsFz*1.3)));
 
-  // mRNA info
-  ctx.fillStyle='rgba(92,248,255,.6)'; ctx.font="11px monospace";
-  ctx.fillText(`mRNA 5'-${MRNA_SEQ}-3'`,px+pw/2,py+130);
+  // mRNA info (wrapped)
+  ctx.fillStyle='rgba(92,248,255,.6)'; ctx.font=`${mrnaFz}px monospace`;
+  mrnaLines.forEach((l,i)=>ctx.fillText(l,px+pw/2,py+mrnaY+i*(mrnaFz*1.4)));
 
   // What happens next
-  const steps=['① Ribosome dissociates → subunits recycle','② Polypeptide folds into 3D structure','③ Chaperones assist correct folding','④ Protein targets its destination'];
   steps.forEach((s2,i)=>{
-    ctx.fillStyle='rgba(180,220,255,.65)'; ctx.font="11px 'Segoe UI'";
-    ctx.textAlign='left'; ctx.fillText(s2,px+20,py+158+i*20);
+    ctx.fillStyle='rgba(180,220,255,.65)'; ctx.font=`${stepFz}px 'Segoe UI'`;
+    ctx.textAlign='left'; ctx.fillText(s2,px+20,py+stepsY+i*stepLh);
   });
 
   // Reset hint
@@ -837,7 +875,19 @@ function drawInstructions(){
   const lh=fz*1.4;
   const bh=lines.length*lh+16;
   const bw=Math.min(ctx.measureText(lines[0]).width+40, maxW);
-  const bx=W/2-bw/2, by=H-bh-28;
+  // Bottom clearance must clear the institute logo (bottom-left), the mute
+  // button (bottom-right, HTML element: bottom:16px + 40px tall), AND the
+  // translation progress bar (fixed band, shown during translate/done modes).
+  const logoDw = Math.min(150, W*0.20);
+  const logoDh = LOGO_IMG.naturalWidth ? logoDw*(LOGO_IMG.naturalHeight/LOGO_IMG.naturalWidth) : 0;
+  const logoReserve = logoDh + 18 + 14; // logo height + its own margin + gap
+  const muteReserve = 16 + 40 + 14; // mute button bottom offset + height + gap
+  // Progress bar: label sits at by-4 with 11px font above a bar at by..by+8,
+  // where by = H-118. Its own top edge is roughly at H-133, so clearing it
+  // needs a bottom margin of (118+15 label height+gap) ≈ 147 from the bottom.
+  const progressReserve = (S.mode==='translate'||S.mode==='done') ? 147 : 0;
+  const bottomMargin = Math.max(28, logoReserve, muteReserve, progressReserve);
+  const bx=W/2-bw/2, by=H-bh-bottomMargin;
   ctx.fillStyle='rgba(6,13,26,.82)'; ctx.strokeStyle='rgba(92,248,255,.22)'; ctx.lineWidth=1;
   roundRect(ctx,bx,by,bw,bh,18); ctx.fill(); ctx.stroke();
   ctx.fillStyle='rgba(255,255,255,.9)'; ctx.textAlign='center'; ctx.textBaseline='top';
@@ -909,12 +959,36 @@ function drawHeader(){
   ctx.save();
   ctx.fillStyle='rgba(6,13,26,.85)'; ctx.fillRect(0,0,W,48);
   ctx.shadowBlur=10; ctx.shadowColor='#5cf8ff';
-  ctx.fillStyle='#5cf8ff'; ctx.font="600 16px 'Segoe UI'";
+  // Reserve space on the right for the menu toggle button (~68px) so the
+  // title/subtitle never draw underneath it.
+  const rightGuard = 68, leftMargin = 16, gap = 10;
+  const title = '🧬 Protein Translation AR Lab';
+  const subtitle = 'CSIR-IGIB · Class 9–12';
+  const avail = W - leftMargin - rightGuard;
+
+  // Shrink title and subtitle together until they fit side-by-side without
+  // overlapping each other (subtitle stays visible on mobile instead of
+  // disappearing — it just gets smaller).
+  let titleFz = W<480 ? 13 : 16;
+  let subFz = W<480 ? 9 : 11;
+  ctx.font=`600 ${titleFz}px 'Segoe UI'`;
+  let titleW = ctx.measureText(title).width;
+  ctx.font=`${subFz}px 'Segoe UI'`;
+  let subW = ctx.measureText(subtitle).width;
+  while(titleW+gap+subW>avail && (titleFz>10 || subFz>7)){
+    if(titleFz>10){ titleFz--; ctx.font=`600 ${titleFz}px 'Segoe UI'`; titleW=ctx.measureText(title).width; }
+    else { subFz--; }
+    ctx.font=`${subFz}px 'Segoe UI'`; subW=ctx.measureText(subtitle).width;
+  }
+
+  ctx.fillStyle='#5cf8ff'; ctx.font=`600 ${titleFz}px 'Segoe UI'`;
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillText('🧬 Protein Translation AR Lab',16,24);
-  ctx.shadowBlur=0; ctx.fillStyle='rgba(92,248,255,.4)';
-  ctx.font="11px 'Segoe UI'"; ctx.textAlign='right';
-  ctx.fillText('CSIR-IGIB · Class 9–12',W-60,24);
+  ctx.fillText(title,leftMargin,24);
+
+  ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(92,248,255,.4)';
+  ctx.font=`${subFz}px 'Segoe UI'`; ctx.textAlign='right';
+  ctx.fillText(subtitle,W-rightGuard,24);
   ctx.restore();
 }
 
@@ -931,6 +1005,21 @@ function roundRect(ctx2,x,y,w,h,r){
   ctx2.lineTo(x+r,y+h); ctx2.quadraticCurveTo(x,y+h,x,y+h-r);
   ctx2.lineTo(x,y+r); ctx2.quadraticCurveTo(x,y,x+r,y);
   ctx2.closePath();
+}
+
+// Wraps text to fit maxWidth given the ctx's CURRENT font, returning an array of lines.
+// Used to keep long strings (flash messages, summary stats, mRNA sequence, etc.)
+// from overflowing off-screen on narrow mobile viewports.
+function wrapText(text,maxWidth){
+  const words=String(text).split(' ');
+  const lines=[]; let line='';
+  for(const w of words){
+    const test=line?line+' '+w:w;
+    if(ctx.measureText(test).width>maxWidth && line){ lines.push(line); line=w; }
+    else line=test;
+  }
+  if(line) lines.push(line);
+  return lines;
 }
 
 // ═══════════════════════════════════════════════════════════════════
