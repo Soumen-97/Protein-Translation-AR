@@ -50,17 +50,19 @@ const LOGO_IMG = new Image();
 LOGO_IMG.src = LOGO_IMG_SRC;
 function drawInstituteLogo(){
   if(!LOGO_IMG.naturalWidth) return;
- const margin = (W < 768)
-    ? 70 + SAFE_BOTTOM
-    : 18 + SAFE_BOTTOM;
-  const dw = Math.min(150, W*0.20);
-  const dh = dw * (LOGO_IMG.naturalHeight / LOGO_IMG.naturalWidth);
-  ctx.save();
-  ctx.globalAlpha = 0.92;
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = 'rgba(0,0,0,0.6)';
-  ctx.drawImage(LOGO_IMG, margin, H - dh - margin, dw, dh);
-  ctx.restore();
+ const xMargin = (W < 768) ? 5 : 18;                  // Move left on mobile
+const yMargin = (W < 768) ? 70 + SAFE_BOTTOM         // Keep raised
+                          : 18 + SAFE_BOTTOM;
+
+const dw = Math.min(150, W*0.20);
+const dh = dw * (LOGO_IMG.naturalHeight / LOGO_IMG.naturalWidth);
+
+ctx.save();
+ctx.globalAlpha = 0.92;
+ctx.shadowBlur = 10;
+ctx.shadowColor = 'rgba(0,0,0,0.6)';
+ctx.drawImage(LOGO_IMG, xMargin, H - dh - yMargin, dw, dh);
+ctx.restore();
 }
 function drawCopyright(){
   ctx.save();
