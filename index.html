@@ -19,7 +19,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 #loading p{color:rgba(255,255,255,.45);font-size:14px;max-width:320px;line-height:1.7}
 .spinner{width:44px;height:44px;border:2.5px solid rgba(255,255,255,.1);border-top-color:#5cf8ff;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#mute{position:absolute;bottom:calc(40px + env(safe-area-inset-bottom, 0px));right:16px;z-index:100;background:rgba(6,13,26,.8);border:1px solid rgba(92,248,255,.3);color:#5cf8ff;font-size:20px;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#mute{position:absolute;bottom:calc(60px + env(safe-area-inset-bottom, 0px));right:16px;z-index:100;background:rgba(6,13,26,.8);border:1px solid rgba(92,248,255,.3);color:#5cf8ff;font-size:20px;width:40px;height:40px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #mute:hover{background:rgba(92,248,255,.15)}
 </style>
 </head>
@@ -50,7 +50,7 @@ const LOGO_IMG = new Image();
 LOGO_IMG.src = LOGO_IMG_SRC;
 function drawInstituteLogo(){
   if(!LOGO_IMG.naturalWidth) return;
-  const margin = 40 + SAFE_BOTTOM;
+  const margin = 60 + SAFE_BOTTOM;
   const dw = Math.min(150, W*0.20);
   const dh = dw * (LOGO_IMG.naturalHeight / LOGO_IMG.naturalWidth);
   ctx.save();
@@ -65,7 +65,7 @@ function drawCopyright(){
   ctx.textAlign='center'; ctx.textBaseline='alphabetic';
   ctx.font=`400 11px 'Segoe UI',sans-serif`;
   ctx.fillStyle='rgba(255,255,255,0.25)';
-  ctx.fillText('© Created by Soumen Kundu', W/2, H-34-SAFE_BOTTOM);
+  ctx.fillText('© Created by Soumen Kundu', W/2, H-54-SAFE_BOTTOM);
   ctx.restore();
 }
 
@@ -913,12 +913,12 @@ function drawInstructions(){
   const logoDw = Math.min(150, W*0.20);
   const logoDh = LOGO_IMG.naturalWidth ? logoDw*(LOGO_IMG.naturalHeight/LOGO_IMG.naturalWidth) : 0;
   const logoReserve = logoDh + 18 + SAFE_BOTTOM + 14; // logo height + its own margin (incl. safe-area) + gap
-  const muteReserve = 40 + 40 + 14; // mute button bottom offset + height + gap
+  const muteReserve = 60 + 40 + 14; // mute button bottom offset + height + gap
   // Progress bar: label sits at by-4 with 11px font above a bar at by..by+8,
   // where by = H-118. Its own top edge is roughly at H-133, so clearing it
   // needs a bottom margin of (118+15 label height+gap) ≈ 147 from the bottom.
   const progressReserve = (S.mode==='translate'||S.mode==='done') ? 147 : 0;
-  const bottomMargin = Math.max(52, logoReserve, muteReserve, progressReserve);
+  const bottomMargin = Math.max(72, logoReserve, muteReserve, progressReserve);
   const bx=W/2-bw/2, by=H-bh-bottomMargin;
   ctx.fillStyle='rgba(6,13,26,.82)'; ctx.strokeStyle='rgba(92,248,255,.22)'; ctx.lineWidth=1;
   roundRect(ctx,bx,by,bw,bh,18); ctx.fill(); ctx.stroke();
